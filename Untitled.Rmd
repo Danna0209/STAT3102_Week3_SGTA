@@ -1,0 +1,244 @@
+---
+title: 'STAT3102 Week 3 SGTA Report'
+author: 'Seo Yeon Pyo'
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8,
+  fig.height = 5,
+  fig.align = "center"
+)
+
+library(tidyverse)
+library(here)
+library(knitr)
+```
+
+# Overview
+
+This report completes the exercises for **STAT3102/6102 Week 3 SGTA**, focusing on categorical visualization techniques (pie charts, standard bar charts, and Pareto charts) and continuous distribution analysis (histograms, bin width exploration, and comparative boxplots).
+
+---
+
+# Exercise 1: Categorical Data Visualisations (`stat270.csv`)
+
+Recall that the dataset `stat270.csv` contains three variables: `ID`, `Country`, and `Statdiv` (Statistical Division). Here, we construct pie charts, ordered bar charts, and Pareto charts for the `Statdiv` variable.
+
+```{r ex1-data}
+# Read stat270 dataset
+stat270 <- read_csv("stat270.csv")
+
+# Standardise column names to lowercase so Statdiv becomes statdiv
+colnames(stat270) <- tolower(colnames(stat270))
+
+# Clean and summarise statistical division counts
+df_statdiv <- stat270 %>%
+  filter(!is.na(statdiv)) %>%
+  count(statdiv, name = "counts") %>%
+  mutate(percentage = round(counts / sum(counts) * 100, 1))
+```
+
+### 1. Pie Chart
+While pie charts rely on angle and area perception, adding direct labels improves clarity.
+
+```{r ex1-pie}
+ggplot(df_statdiv, aes(x = "", y = counts, fill = statdiv)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  theme_void() +
+  labs(
+    title = "Distribution of Students by Statistical Division",
+    subtitle = "Pie Chart Display",
+    fill = "Statistical Division"
+  ) +
+  theme(plot.title = element_text(face = "bold", size = 14))
+```
+
+### 2. Standard & Ordered Bar Chart (Pareto Chart)
+Ordering the categories by frequency creates a **Pareto Chart**, applying Cleveland's principle of position along a common scale and adhering to Wainer's rule against arbitrary orderings.
+
+```{r ex1-pareto}
+ggplot(df_statdiv, aes(x = reorder(statdiv, -counts), y = counts, fill = statdiv)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = counts), vjust = -0.5, size = 3.5) +
+  theme_minimal() +
+  labs(
+    title = "Pareto Chart: Student Counts by Statistical Division",
+    x = "Statistical Division",
+    y = "Number of Students"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
+
+---
+
+
+# Exercise 2: Australian Prison Population Analysis (ABS 2024)
+
+This exercise analyses prisoner data by most serious offence/charge and legal status (sentenced vs. unsentenced) across sexes, sourced from the Australian Bureau of Statistics (ABS 2024).
+
+```{r ex2-data}
+# Construct prisoners tibble as specified
+prisoners <- tibble(
+  Offence = c(
+    "Homicide", "Acts to Cause Injury", "Sexual Assault", "Dangerous/Negligent Acts",
+    "Abduction/Harassment", "Robbery/Extortion", "Unlawful Entry", "Theft",
+    "Fraud/Deception", "Illicit Drugs", "Weapons/Explosives", "Property Damage",
+    "Public Order", "Traffic/Vehicle", "Offences Against Justice", "Miscellaneous"
+  ),
+  total_males = c(3061, 11335, 7244, 1413, 610, 2332, 3434, 1302, 437, 4663, 826, 558, 138, 338, 3104, 71),
+  total_females = c(298, 980, 111, 119, 45, 239, 327, 225, 127, 550, 46, 70, 11, 36, 239, 10)
+)
+
+# Reshape data to long format for side-by-side ggplot visualisations
+prisoners_long <- prisoners %>%
+  pivot_longer(
+    cols = c(total_males, total_females),
+    names_to = "Sex",
+    names_prefix = "total_",
+    values_to = "Count"
+  ) %>%
+  mutate(Sex = ifelse(Sex == "males", "Males", "Females"))
+```
+
+### Side-by-Side Comparative Bar Chart
+Comparing total male and female prisoner counts across major offence types:
+
+```{r ex2-barchart}
+ggplot(prisoners_long, aes(x = Offence, y = Count, fill = Sex)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Males" = "#2b5c8f", "Females" = "#d95f02")) +
+  theme_minimal() +
+  labs(
+    title = "Australian Prisoner Population by Offence & Sex (ABS 2024)",
+    x = "Most Serious Offence / Charge",
+    y = "Number of Prisoners",
+    fill = "Sex"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title = element_text(face = "bold", size = 13)
+  )
+```
+
+### Comparative Pareto Chart (Ordered by Offence Volume)
+Sorting offences by total volume facilitates clearer visual evaluation of high-frequency offences.
+
+```{r ex2-pareto}
+# Sort offences by combined total
+prisoners_long <- prisoners_long %>%
+  group_by(Offence) %>%
+  mutate(Total_Offence = sum(Count)) %>%
+  ungroup()
+
+ggplot(prisoners_long, aes(x = reorder(Offence, -Total_Offence), y = Count, fill = Sex)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Males" = "#1f78b4", "Females" = "#e31a1c")) +
+  theme_minimal() +
+  labs(
+    title = "Pareto Chart: Prisoner Offence Categories Ordered by Frequency",
+    x = "Offence Category",
+    y = "Number of Prisoners",
+    fill = "Sex"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title = element_text(face = "bold", size = 13)
+  )
+```
+
+---
+
+
+# Exercise 3: School Suspension Analysis (`truant.csv`)
+
+This section explores school suspension data from NSW districts (1998) to evaluate the impact of bin width, starting points, and boxplots on statistical communication.
+
+```{r ex3-data}
+truant <- read_csv("truant.csv")
+
+# Convert gender to labelled factor (1 = Male, 2 = Female)
+truant <- truant %>%
+  mutate(Gender = factor(gender, levels = c(1, 2), labels = c("Male", "Female")))
+```
+
+### Descriptive Statistics: Total Long Suspensions
+
+```{r ex3-summary}
+summary_stats <- truant %>%
+  summarise(
+    Mean = mean(long, na.rm = TRUE),
+    SD = sd(long, na.rm = TRUE),
+    Median = median(long, na.rm = TRUE),
+    IQR = IQR(long, na.rm = TRUE),
+    Min = min(long, na.rm = TRUE),
+    Max = max(long, na.rm = TRUE)
+  )
+
+kable(summary_stats, digits = 2, caption = "Summary Statistics: Long Suspensions")
+```
+
+### Bin Width & Histogram Parameter Exploration
+
+Comparing default bin widths against widths of 40 and 20:
+
+```{r ex3-histograms, fig.height=8}
+p1 <- ggplot(truant, aes(x = long)) +
+  geom_histogram(fill = "#3182bd", color = "white") +
+  theme_minimal() +
+  labs(title = "Default R Bin Width", x = "Long Suspensions", y = "Count")
+
+p2 <- ggplot(truant, aes(x = long)) +
+  geom_histogram(binwidth = 40, fill = "#3182bd", color = "white") +
+  theme_minimal() +
+  labs(title = "Bin Width = 40", x = "Long Suspensions", y = "Count")
+
+p3 <- ggplot(truant, aes(x = long)) +
+  geom_histogram(binwidth = 20, fill = "#3182bd", color = "white") +
+  theme_minimal() +
+  labs(title = "Bin Width = 20", x = "Long Suspensions", y = "Count")
+
+library(gridExtra)
+grid.arrange(p1, p2, p3, ncol = 1)
+```
+
+**Analytical Observations:**
+* **Effect of Bin Width = 40:** Over-smooths the distribution, hiding localized peaks and right-skew detail.
+* **Effect of Bin Width = 20:** Strikes a strong balance between noise reduction and structural clarity, clearly capturing the right-skewed distribution of suspensions across school districts.
+
+### Comparative Boxplots: Males vs. Females
+
+```{r ex3-boxplots}
+ggplot(truant, aes(x = Gender, y = long, fill = Gender)) +
+  geom_boxplot(alpha = 0.7, outlier.color = "red") +
+  theme_minimal() +
+  scale_fill_manual(values = c("Male" = "#2c7fb8", "Female" = "#fa9fb5")) +
+  labs(
+    title = "Comparative Boxplot: Long Suspensions by Gender",
+    x = "Gender",
+    y = "Number of Long Suspensions"
+  ) +
+  theme(plot.title = element_text(face = "bold", size = 13))
+```
+
+---
+
+# Integration with Lecture Principles
+
+* **Cleveland & McGill Hierarchy:** Ordering categories in Exercises 1 and 2 onto a **position along a common scale** significantly outperforms pie chart angle evaluation[cite: 43, 53].
+* **Wainer's Rules:** Avoided "Alabama First" (arbitrary sorting) by implementing Pareto reordering[cite: 36, 53].
+* **Data-to-Ink Ratio:** Minimalist themes (`theme_minimal()`) and precise bin selections preserve data density without chartjunk[cite: 11, 15, 53].
